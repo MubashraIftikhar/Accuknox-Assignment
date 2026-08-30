@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: wisecow-deployment
+  labels:
+    app: wisecow
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: wisecow
+  template:
+    metadata:
+      labels:
+        app: wisecow
+    spec:
+      containers:
+        - name: wisecow
+          # REPLACE with your actual pushed image before committing, e.g.
+          # mubashariftikhar/wisecow:v1
+          image: DOCKERHUB_USERNAME/wisecow:TAG
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 4499
+          readinessProbe:
+            tcpSocket:
+              port: 4499
+            initialDelaySeconds: 3
+            periodSeconds: 5
+          livenessProbe:
+            tcpSocket:
+              port: 4499
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "64Mi"
+            limits:
+              cpu: "200m"
+              memory: "128Mi"
