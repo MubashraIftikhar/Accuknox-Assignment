@@ -2,6 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: wisecow-deployment
+  namespace: wisecow
   labels:
     app: wisecow
 spec:
@@ -16,9 +17,7 @@ spec:
     spec:
       containers:
         - name: wisecow
-          # REPLACE with your actual pushed image before committing, e.g.
-          # mubashariftikhar/wisecow:v1
-          image: DOCKERHUB_USERNAME/wisecow:TAG
+          image: mubashraiftikhar10/wisecow:TAG
           imagePullPolicy: Always
           ports:
             - containerPort: 4499
