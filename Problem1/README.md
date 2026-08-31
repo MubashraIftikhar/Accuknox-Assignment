@@ -54,6 +54,8 @@ Accuknox-Assignment/
 ---
 **HTTPS working (curl to wisecow.local)**
 ---
+<img width="623" height="340" alt="image" src="https://github.com/user-attachments/assets/2b4f9076-4941-4e5b-bd96-c10ff7c2cdca" />
+
 <img width="1176" height="405" alt="WhatsApp Image 2026-08-31 at 2 52 30 PM" src="https://github.com/user-attachments/assets/78376fa8-6206-4edf-b9ef-2bc2fd40e7d9" />
 
 ---
