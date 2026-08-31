@@ -1,0 +1,54 @@
+name: Problem1 - Wisecow CI/CD
+
+on:
+  push:
+    branches: [ "main" ]
+    paths:
+      - "Problem1/**"
+
+env:
+  IMAGE_NAME: wisecow
+  NAMESPACE: wisecow
+
+jobs:
+  build-and-deploy:
+    runs-on: self-hosted
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set image tag (short commit SHA)
+        id: meta
+        run: echo "tag=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build image
+        run: |
+          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:latest \
+                        -t ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.tag }} \
+                        Problem1/
+
+      - name: Push image
+        run: |
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:latest
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.tag }}
+
+      - name: Apply k8s manifests
+        run: |
+          kubectl apply -f Problem1/k8s/deployment.yaml
+          kubectl apply -f Problem1/k8s/service.yaml
+          kubectl apply -f Problem1/k8s/ingress.yaml
+
+      - name: Deploy new image
+        run: |
+          kubectl set image deployment/wisecow-deployment \
+            wisecow=${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.tag }} \
+            -n ${{ env.NAMESPACE }}
+
+      - name: Wait for rollout
+        run: kubectl rollout status deployment/wisecow-deployment -n ${{ env.NAMESPACE }} --timeout=120s
