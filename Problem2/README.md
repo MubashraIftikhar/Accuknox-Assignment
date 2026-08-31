@@ -34,45 +34,32 @@ python3 app_health_checker.py https://wisecow.local:8443 --insecure
 ```
 
 ## Proof of Work
-
+---
 **1. Normal run — all metrics under threshold**
-```
-$ python3 system_health_monitor.py
---- Health check at 2026-08-31 16:37:11 ---
-[2026-08-31 16:37:12] INFO:  CPU usage: 9.7%
-[2026-08-31 16:37:12] INFO:  Memory usage: 53.4% (used 1018MB / total 1905MB)
-[2026-08-31 16:37:12] INFO:  Disk usage (/): 42.5% (free 10GB)
-[2026-08-31 16:37:12] INFO:  Running processes: 170
-```
+---
+<img width="805" height="277" alt="WhatsApp Image 2026-08-31 at 9 37 34 PM" src="https://github.com/user-attachments/assets/4b9f85d0-2811-446a-b7e8-62304fd2e843" />
 
+---
 **2. Alert correctly fires when CPU is pushed to 100%**
-```
-$ for i in $(seq 1 $(nproc)); do (while true; do :; done) & done
-$ python3 system_health_monitor.py
-[...] INFO:  CPU usage: 100.0%
-[...] ALERT: CPU usage is 100.0%, which exceeds the 80% threshold.
-$ kill $(jobs -p)
-```
+---
+<img width="769" height="417" alt="WhatsApp Image 2026-08-31 at 9 41 03 PM" src="https://github.com/user-attachments/assets/c8105af7-b9d0-47f9-bde3-5039dfd0fcd8" />
 Confirms threshold logic actually triggers, not just prints numbers.
 
+---
 **3. Alert written to log file, not just console**
-```
-$ cat health_monitor.log
-[2026-08-31 16:4x:xx] ALERT: CPU usage is 100.0%, which exceeds the 80% threshold.
-```
+---
+<img width="802" height="135" alt="WhatsApp Image 2026-08-31 at 9 41 24 PM" src="https://github.com/user-attachments/assets/baedf12d-2aef-4826-b2a4-536e3e2869ed" />
 
+---
 **4. Application Health Checker correctly detects DOWN**
-```
-$ python3 app_health_checker.py https://wisecow.local:8443 --insecure
-[2026-08-31 16:41:41] https://wisecow.local:8443 -> DOWN (Connection error (host unreachable / refused))
-```
-(App was unreachable at this point because the `kubectl port-forward` tunnel to the ingress controller wasn't active — proves the script correctly reports DOWN rather than falsely reporting UP.)
+---
+<img width="1150" height="190" alt="WhatsApp Image 2026-08-31 at 9 41 59 PM" src="https://github.com/user-attachments/assets/6e6341d7-2faf-4444-ab40-1fe0e95db772" />
 
+(App was unreachable at this point because the `kubectl port-forward` tunnel to the ingress controller wasn't active — proves the script correctly reports DOWN rather than falsely reporting UP.)
+---
 **5. Application Health Checker correctly detects UP**
-```
-$ kubectl port-forward -n ingress-nginx svc/ingress-nginx-controller 8443:443 &
-$ echo "127.0.0.1 wisecow.local" | sudo tee -a /etc/hosts
-$ python3 app_health_checker.py https://wisecow.local:8443 --insecure
-[...] https://wisecow.local:8443 -> UP (HTTP 200)
-```
+---
+<img width="1141" height="259" alt="WhatsApp Image 2026-08-31 at 9 45 01 PM" src="https://github.com/user-attachments/assets/549ebdd8-77cb-46bc-bd20-6cc8676b158f" />
+
+
 Same app, same URL, only difference is the tunnel being active — confirms the UP/DOWN classification is accurate in both directions, not hardcoded.
