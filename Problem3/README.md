@@ -9,11 +9,13 @@ is explicitly blocked.
 
 1. Installed KubeArmor on the same `kind` cluster used in Problem 1.
 2. Wrote a `KubeArmorPolicy` targeting pods labeled `app: wisecow` in the `wisecow` namespace.
-3. The policy **blocks**:
+3. The policy **blocks**: [policy *action* is set to Block; actual enforcement is
+   audit-only in this Kind setup — see note below]
    - Interactive shells (`/bin/bash`, `/bin/sh`) — prevents an attacker (or anyone via `kubectl exec`) from getting a shell inside the container.
    - Package managers (`apt`, `apt-get`) and download tools (`curl`, `wget`) — prevents installing or pulling in extra tools at runtime.
    - Reads of sensitive files (`/etc/shadow`, `/etc/passwd`).
-4. Applied the policy and captured a real policy violation by attempting a blocked action.
+4. Applied the policy and captured a real policy violation by attempting a blocked action. [attempting an action the policy is configured to block — the attempt succeeded and was logged, not prevented, due to the Kind/LSM limitation below]
+
 
 ## Why this is "zero trust"
 
@@ -23,71 +25,61 @@ The wisecow container's only real job is running `wisecow.sh`, which itself call
 
 - [`wisecow-zero-trust-policy.yaml`](./wisecow-zero-trust-policy.yaml) — the policy
 
-## How to reproduce
-
-**1. Install KubeArmor on the cluster** (on EC2, same `kind-wisecow` cluster):
-```bash
-curl -sfL http://get.kubearmor.io/ | sudo sh -s -- -b /usr/local/bin
-karmor install
-```
-Wait for the KubeArmor DaemonSet to be ready:
-```bash
-kubectl get pods -n kube-system | grep kubearmor
-```
-
-**2. Apply the policy:**
-```bash
-kubectl apply -f wisecow-zero-trust-policy.yaml
-kubectl get kubearmorpolicy -n wisecow
-```
-
-**3. Trigger a violation — try to get an interactive shell into the wisecow container:**
-```bash
-POD=$(kubectl get pod -n wisecow -l app=wisecow -o jsonpath='{.items[0].metadata.name}')
-kubectl exec -it $POD -n wisecow -- /bin/bash
-```
-Expected result: **Permission denied** — the shell exec is blocked by the policy, not by Kubernetes RBAC. This is the proof the policy is actually enforcing at the kernel/LSM level, not just sitting there as config.
-
-**4. Watch live policy violation logs with the KubeArmor CLI:**
-```bash
-karmor logs -n wisecow
-```
-This streams alerts in real time — trigger the blocked command again in another terminal while this is running to see the violation appear live.
 
 ## Proof of Work
 
+---
 **1. KubeArmor installed and running**
-```
-$ kubectl get pods -n kube-system | grep kubearmor
-[shows kubearmor daemonset pod(s) Running]
-```
+---
+<img width="524" height="284" alt="image" src="https://github.com/user-attachments/assets/489bf824-69c2-42c2-b5bd-268788f52559" />
 
+---
 **2. Policy applied successfully**
-```
-$ kubectl get kubearmorpolicy -n wisecow
-NAME                        AGE
-wisecow-zero-trust-policy   Xs
-```
+---
+<img width="503" height="53" alt="image" src="https://github.com/user-attachments/assets/922bb00e-3aa4-4b95-811d-04be2399f916" />
 
-**3. Policy violation — blocked shell exec**
-```
-$ kubectl exec -it $POD -n wisecow -- /bin/bash
-OCI runtime exec failed: exec failed: unable to start container process:
-exec: "/bin/bash": permission denied: unknown
-command terminated with exit code 126
-```
+---
+**3. Policy violation — **
+---
+<img width="234" height="64" alt="image" src="https://github.com/user-attachments/assets/c28e15f4-ea19-4b37-b8d6-7d2224369e12" />
 
+---
 **4. Live violation log from `karmor logs`**
+---
+
 ```
 $ karmor logs -n wisecow
 == Alert / <timestamp> ==
-ClusterName: default
-HostName: wisecow-control-plane
-NamespaceName: wisecow
-PodName: wisecow-deployment-...
-Source: /bin/bash
-Operation: Process
-Resource: /bin/bash
-Action: Block
-Result: Permission denied
+ContainerName: wisecow
+ContainerID: c922a7e357d233ad1ae062cdb1bfae8814ab07c79f16e961832422c4d38bfc2d
+ContainerImage: docker.io/mubashraiftikhar10/wisecow:4d86c59@sha256:3dbfb494fb0840fc9a213b3c8668e2c784aa5c24086b2b48745c17dc54825b95
+Type: MatchedPolicy
+PolicyName: wisecow-zero-trust-policy
+Severity: 8
+Source: /usr/bin/whoami
+Resource: /etc/passwd
+Operation: File
+Action: Audit (Block)
+Data: syscall=SYS_OPENAT fd=-100 flags=O_RDONLY|O_CLOEXEC
+EventData: map[Fd:-100 Flags:O_RDONLY|O_CLOEXEC Syscall:SYS_OPENAT]
+Enforcer: eBPF Monitor
 ```
+## Note on KubeArmor Enforcement
+
+KubeArmor is deployed and the zero-trust policy is applied. It successfully
+**detects** violations (see screenshot/logs — `Action: Audit (Block)`), but it
+doesn't actually **block** them.
+
+This is because KubeArmor needs a Linux security feature (called an **LSM** —
+like AppArmor or BPF-LSM) to enforce policies, not just watch them. I checked
+and found:
+
+- The EC2 host has AppArmor enabled, but it doesn't carry over into the Kind
+  node (Kind runs nodes as containers, not real VMs).
+- The Kind node image doesn't even have the tool (`apparmor_parser`) needed to
+  use AppArmor.
+- Confirmed with `karmor probe`, which showed no active LSM inside the node.
+
+So this is a limitation of running Kind in this setup, not a mistake in the
+policy itself. The policy works correctly — it just can't fully enforce without
+a real VM or bare-metal node.
