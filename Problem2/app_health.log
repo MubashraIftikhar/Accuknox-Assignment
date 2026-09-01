@@ -1,0 +1,3 @@
+[2026-08-31 16:41:41] https://wisecow.local:8443 -> DOWN (Connection error (host unreachable / refused))
+[2026-08-31 16:42:44] https://wisecow.local:8443 -> DOWN (Connection error (host unreachable / refused))
+[2026-08-31 16:44:40] https://wisecow.local:8443 -> UP (HTTP 200)
