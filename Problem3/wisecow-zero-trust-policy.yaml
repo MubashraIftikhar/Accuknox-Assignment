@@ -1,0 +1,42 @@
+apiVersion: security.kubearmor.com/v1
+kind: KubeArmorPolicy
+metadata:
+  name: wisecow-zero-trust-policy
+  namespace: wisecow
+spec:
+  severity: 8
+  selector:
+    matchLabels:
+      app: wisecow
+
+  # ---------------------------------------------------------------------
+  # Zero-trust process control:
+  # The wisecow container only ever needs to run wisecow.sh itself
+  # (which internally calls fortune, cowsay, and ncat). It should NEVER
+  # need an interactive shell or package manager at runtime — those are
+  # exactly the tools an attacker would use after gaining initial access
+  # (e.g. via `kubectl exec` or a container escape) to explore the
+  # filesystem, install extra tools, or pivot further. Denying them by
+  # default is the core "zero trust" idea: nothing is allowed unless
+  # explicitly required for the app to function.
+  # ---------------------------------------------------------------------
+  process:
+    matchPaths:
+      - path: /bin/bash
+      - path: /bin/sh
+      - path: /usr/bin/apt
+      - path: /usr/bin/apt-get
+      - path: /usr/bin/wget
+      - path: /usr/bin/curl
+    action: Block
+
+  # ---------------------------------------------------------------------
+  # Zero-trust file access control:
+  # Block reads of sensitive host/identity files that a compromised
+  # process has no legitimate reason to touch.
+  # ---------------------------------------------------------------------
+  file:
+    matchPaths:
+      - path: /etc/shadow
+      - path: /etc/passwd
+    action: Block
