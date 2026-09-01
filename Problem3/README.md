@@ -25,7 +25,6 @@ The wisecow container's only real job is running `wisecow.sh`, which itself call
 
 - [`wisecow-zero-trust-policy.yaml`](./wisecow-zero-trust-policy.yaml) — the policy
 
-
 ## Proof of Work
 
 ---
@@ -83,3 +82,36 @@ and found:
 So this is a limitation of running Kind in this setup, not a mistake in the
 policy itself. The policy works correctly — it just can't fully enforce without
 a real VM or bare-metal node.
+
+## How to reproduce
+---
+**1. Install KubeArmor on the cluster** (on EC2, same `kind-wisecow` cluster):
+```bash
+curl -sfL http://get.kubearmor.io/ | sudo sh -s -- -b /usr/local/bin
+karmor install
+```
+Wait for the KubeArmor DaemonSet to be ready:
+```bash
+kubectl get pods -n kube-system | grep kubearmor
+```
+
+**2. Apply the policy:**
+```bash
+kubectl apply -f wisecow-zero-trust-policy.yaml
+kubectl get kubearmorpolicy -n wisecow
+```
+
+**3. Trigger a violation — try to get an interactive shell into the wisecow container:**
+```bash
+POD=$(kubectl get pod -n wisecow -l app=wisecow -o jsonpath='{.items[0].metadata.name}')
+kubectl exec -it $POD -n wisecow -- /bin/bash
+```
+Expected result: **Permission denied** — the shell exec is blocked by the policy, not by Kubernetes RBAC.
+Actual result in this setup: the exec succeeds and the action is logged as a violation (Audit (Block)), not prevented — see "Note on KubeArmor Enforcement" below.
+
+**4. Watch live policy violation logs with the KubeArmor CLI:**
+```bash
+karmor logs -n wisecow
+```
+This streams alerts in real time — trigger the blocked command again in another terminal while this is running to see the violation appear live.
+---
